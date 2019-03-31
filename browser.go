@@ -29,20 +29,25 @@ func main() {
         panic(err)
     }
     go func(con *net.UDPConn) {
-        fmt.Println("started reading..")
         con.SetReadDeadline(time.Now().Add(10 * time.Second))
         readBytes := make([]byte,1500)
-        res, err := con.Read(readBytes)
-        fmt.Println("read")
+        _, err := con.Read(readBytes)
         if err != nil {
             fmt.Printf("%v\n", err)
         }
-        fmt.Printf("%v\n", res)
-        fmt.Printf("%v\n", readBytes)
+        i := 0
+        for i < len(readBytes) {
+            var fst,snd,thd,fth byte = readBytes[i], readBytes[i+1], readBytes[i+2], readBytes[i+3]
+            // read next short?
+            var port uint16
+            port = uint16(readBytes[i+4]) + uint16(readBytes[i+5])
+            fmt.Printf("%v.%v.%v.%v:%v\n", fst, snd, thd, fth, port)
+            i += 6
+        }
         con.Close()
     }(con)
     _, err = con.Write(compose(0x31, region_us_east, "0.0.0.0:", "0", ""))
-    fmt.Println("written data..")
+    fmt.Println("Initial request made.")
     if err != nil {
         panic(err)
     }
