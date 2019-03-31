@@ -31,19 +31,11 @@ func main() {
     go func(con *net.UDPConn) {
         con.SetReadDeadline(time.Now().Add(10 * time.Second))
         readBytes := make([]byte,1500)
-        _, err := con.Read(readBytes)
+        responseLength, err := con.Read(readBytes)
         if err != nil {
             fmt.Printf("%v\n", err)
         }
-        i := 0
-        for i < len(readBytes) {
-            var fst,snd,thd,fth byte = readBytes[i], readBytes[i+1], readBytes[i+2], readBytes[i+3]
-            // read next short?
-            var port uint16
-            port = uint16(readBytes[i+4]) + uint16(readBytes[i+5])
-            fmt.Printf("%v.%v.%v.%v:%v\n", fst, snd, thd, fth, port)
-            i += 6
-        }
+        parseResponse(readBytes[:responseLength])
         con.Close()
     }(con)
     _, err = con.Write(compose(0x31, region_us_east, "0.0.0.0:", "0", ""))
@@ -53,6 +45,19 @@ func main() {
     }
     c := make(chan struct{})
     <-c
+}
+
+// return a list of servers based on a response..
+func parseResponse(response []byte) {
+        i := 0
+        for i < len(response) {
+            var fst,snd,thd,fth byte = response[i], response[i+1], response[i+2], response[i+3]
+            // read next short?
+            var port uint16
+            port = uint16(response[i+4]) + uint16(response[i+5])
+            fmt.Printf("%v.%v.%v.%v:%v\n", fst, snd, thd, fth, port)
+            i += 6
+        }
 }
 
 // compose our message as a series of bytes..
