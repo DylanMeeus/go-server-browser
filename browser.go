@@ -20,6 +20,12 @@ const (
 )
 
 func main() {
+    request(region_europe, "0.0.0.0", "0", "")
+    c := make(chan struct{})
+    <-c
+}
+
+func request(region byte, ip, port, filter string) {
     ipaddr, err := net.ResolveUDPAddr("udp4", addr)
     if err != nil {
         panic(err)
@@ -35,29 +41,31 @@ func main() {
         if err != nil {
             fmt.Printf("%v\n", err)
         }
-        parseResponse(readBytes[:responseLength])
+        ips := parseResponse(readBytes[:responseLength])
+        fmt.Printf("%v\n", ips)
         con.Close()
     }(con)
-    _, err = con.Write(compose(0x31, region_us_east, "0.0.0.0:", "0", ""))
-    fmt.Println("Initial request made.")
+    _, err = con.Write(compose(0x31, region, ip, port, ""))
+    fmt.Println("made request")
     if err != nil {
         panic(err)
     }
-    c := make(chan struct{})
-    <-c
 }
 
 // return a list of servers based on a response..
-func parseResponse(response []byte) {
+func parseResponse(response []byte) ([]string) {
         i := 0
+        ips := make([]string,0,len(response) / 6)
         for i < len(response) {
             var fst,snd,thd,fth byte = response[i], response[i+1], response[i+2], response[i+3]
             // read next short?
             var port uint16
             port = uint16(response[i+4]) + uint16(response[i+5])
-            fmt.Printf("%v.%v.%v.%v:%v\n", fst, snd, thd, fth, port)
+            ip := fmt.Sprintf("%v.%v.%v.%v:%v\n", fst, snd, thd, fth, port)
+            ips = append(ips, ip)
             i += 6
         }
+        return ips
 }
 
 // compose our message as a series of bytes..
@@ -65,6 +73,7 @@ func compose(messageType, region byte, ip, port, filter string) []byte {
     message := make([]byte,0)
     message = append(message, messageType, region)
     // null-terminate our string
+    ip += ":" // to connect to port
     port += "\000"
     filter += "\000"
     for _,b := range []byte(ip) {
