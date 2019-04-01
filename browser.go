@@ -4,6 +4,7 @@ import (
     "fmt"
     "net"
     "time"
+    "strings"
 )
 
 // region
@@ -20,7 +21,7 @@ const (
 )
 
 func main() {
-    request(region_europe, "0.0.0.0", "0", "")
+    request(region_europe, "0.0.0.0", "0", "\appid\240")
     c := make(chan struct{})
     <-c
 }
@@ -36,16 +37,21 @@ func request(region byte, ip, port, filter string) {
     }
     go func(con *net.UDPConn) {
         con.SetReadDeadline(time.Now().Add(10 * time.Second))
-        readBytes := make([]byte,1500)
+        readBytes := make([]byte,3000)
         responseLength, err := con.Read(readBytes)
         if err != nil {
             fmt.Printf("%v\n", err)
         }
-        ips := parseResponse(readBytes[:responseLength])
-        fmt.Printf("%v\n", ips)
         con.Close()
+        ips := parseResponse(readBytes[:responseLength])
+        lastIp := ips[len(ips)-1]
+        fmt.Println(lastIp)
+        if lastIp != "0.0.0.0:0" {
+            parts := strings.Split(lastIp, ":")
+            request(region, parts[0], parts[1], filter) 
+        }
     }(con)
-    _, err = con.Write(compose(0x31, region, ip, port, ""))
+    _, err = con.Write(compose(0x31, region, ip, port, filter)) 
     fmt.Println("made request")
     if err != nil {
         panic(err)
