@@ -26,6 +26,31 @@ func main() {
     <-c
 }
 
+func read(region byte, filter string, con *net.UDPConn) {
+    readBytes := make([]byte,3000)
+    responseLength, err := con.Read(readBytes)
+    if err != nil {
+        fmt.Printf("%v\n", err)
+    }
+    ips := parseResponse(readBytes[:responseLength])
+    for _,i := range ips {
+        if i == "0.0.0.0:0" {
+            print("YAY!!")
+            return
+        }
+    }
+    lastIp := ips[len(ips)-1]
+    fmt.Println(lastIp)
+    if lastIp != "0.0.0.0:0" {
+        parts := strings.Split(lastIp, ":")
+        request(region, parts[0], parts[1], filter, con) 
+    } else {
+        // last ip was received so close the connection
+        fmt.Println("closing connection..")
+        con.Close()
+    }
+}
+
 func request(region byte, ip, port, filter string, con *net.UDPConn) {
     if con == nil {
         fmt.Println("made new connection..")
@@ -38,30 +63,7 @@ func request(region byte, ip, port, filter string, con *net.UDPConn) {
             panic(err)
         }
     }
-    go func(con *net.UDPConn) {
-        readBytes := make([]byte,3000)
-        responseLength, err := con.Read(readBytes)
-        if err != nil {
-            fmt.Printf("%v\n", err)
-        }
-        ips := parseResponse(readBytes[:responseLength])
-        for _,i := range ips {
-            if i == "0.0.0.0:0" {
-                print("YAY!!")
-                return
-            }
-        }
-        lastIp := ips[len(ips)-1]
-        fmt.Println(lastIp)
-        if lastIp != "0.0.0.0:0" {
-            parts := strings.Split(lastIp, ":")
-            request(region, parts[0], parts[1], filter, con) 
-        } else {
-            // last ip was received so close the connection
-            fmt.Println("closing connection..")
-            con.Close()
-        }
-    }(con)
+    go read(region, filter, con)
     _, err := con.Write(compose(0x31, region, ip, port, filter)) 
     fmt.Println("made request")
     if err != nil {
