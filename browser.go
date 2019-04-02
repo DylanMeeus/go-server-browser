@@ -1,6 +1,8 @@
 package main
 
 import (
+    "os"
+    "encoding/binary"
     "fmt"
     "net"
     "time"
@@ -44,6 +46,12 @@ func request(region byte, ip, port, filter string) {
         }
         con.Close()
         ips := parseResponse(readBytes[:responseLength])
+        for _,i := range ips {
+            if i == "0.0.0.0:0" {
+                print("YAY!!")
+                return
+            }
+        }
         lastIp := ips[len(ips)-1]
         fmt.Println(lastIp)
         if lastIp != "0.0.0.0:0" {
@@ -60,17 +68,19 @@ func request(region byte, ip, port, filter string) {
 
 // return a list of servers based on a response..
 func parseResponse(response []byte) ([]string) {
-        i := 0
-        ips := make([]string,0,len(response) / 6)
+        i := 6
+       ips := make([]string,0,len(response) / 6)
         for i < len(response) {
             var fst,snd,thd,fth byte = response[i], response[i+1], response[i+2], response[i+3]
             // read next short?
-            var port uint16
-            port = uint16(response[i+4]) + uint16(response[i+5])
+            s := []byte{response[i+4], response[i+5]}
+            port := binary.BigEndian.Uint16(s)
             ip := fmt.Sprintf("%v.%v.%v.%v:%v\n", fst, snd, thd, fth, port)
             ips = append(ips, ip)
             i += 6
         }
+        fmt.Printf("%v\n",ips)
+        os.Exit(1)
         return ips
 }
 
