@@ -4,7 +4,6 @@ import (
     "encoding/binary"
     "fmt"
     "net"
-    "time"
     "strings"
 )
 
@@ -22,28 +21,29 @@ const (
 )
 
 func main() {
-    request(region_europe, "0.0.0.0", "0", "\appid\240")
+    request(region_europe, "0.0.0.0", "0", "\appid\240", nil)
     c := make(chan struct{})
     <-c
 }
 
-func request(region byte, ip, port, filter string) {
-    ipaddr, err := net.ResolveUDPAddr("udp4", addr)
-    if err != nil {
-        panic(err)
-    }
-    con, err := net.DialUDP("udp", nil, ipaddr)
-    if err != nil {
-        panic(err)
+func request(region byte, ip, port, filter string, con *net.UDPConn) {
+    if con == nil {
+        fmt.Println("made new connection..")
+        ipaddr, err := net.ResolveUDPAddr("udp4", addr)
+        if err != nil {
+            panic(err)
+        }
+        con, err = net.DialUDP("udp", nil, ipaddr)
+        if err != nil {
+            panic(err)
+        }
     }
     go func(con *net.UDPConn) {
-        con.SetReadDeadline(time.Now().Add(10 * time.Second))
         readBytes := make([]byte,3000)
         responseLength, err := con.Read(readBytes)
         if err != nil {
             fmt.Printf("%v\n", err)
         }
-        con.Close()
         ips := parseResponse(readBytes[:responseLength])
         for _,i := range ips {
             if i == "0.0.0.0:0" {
@@ -55,10 +55,14 @@ func request(region byte, ip, port, filter string) {
         fmt.Println(lastIp)
         if lastIp != "0.0.0.0:0" {
             parts := strings.Split(lastIp, ":")
-            request(region, parts[0], parts[1], filter) 
+            request(region, parts[0], parts[1], filter, con) 
+        } else {
+            // last ip was received so close the connection
+            fmt.Println("closing connection..")
+            con.Close()
         }
     }(con)
-    _, err = con.Write(compose(0x31, region, ip, port, filter)) 
+    _, err := con.Write(compose(0x31, region, ip, port, filter)) 
     fmt.Println("made request")
     if err != nil {
         panic(err)
